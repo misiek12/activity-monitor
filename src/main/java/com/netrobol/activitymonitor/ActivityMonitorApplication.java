@@ -1,6 +1,10 @@
 package com.netrobol.activitymonitor;
 
+import java.io.File;
+import java.time.LocalDate;
+
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
@@ -9,6 +13,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import com.netrobol.activitymonitor.service.ReportService;
 import com.netrobol.activitymonitor.service.TaskListService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -26,23 +31,41 @@ public class ActivityMonitorApplication {
 		SpringApplication.run(ActivityMonitorApplication.class, args);
 	}
 
+	@Autowired
+	TaskListService taskInfoService;
+
+	@Autowired
+	ReportService reportService;
+
 	@PostConstruct
 	public void init() {
 		try {
-			TaskListService service = ctx.getBean(TaskListService.class);
-			service.init();
+			taskInfoService.init();
 		} catch (Exception e) {
 			log.error("Problems initializing service", e);
 		}
 	}
 
-	@Scheduled(fixedRateString = "${app.schedule.frequency}", initialDelay = 1000)
+	@PreDestroy
+	public void destroy() {
+		log.debug("Application closing");
+	}
+
+	@Scheduled(fixedRateString = "${app.schedule.frequency.check}", initialDelayString = "${app.schedule.initialDelay}")
 	public void checkActiviti() {
 		try {
-			TaskListService service = ctx.getBean(TaskListService.class);
-			service.execute();
+			taskInfoService.execute();
 		} catch (Exception e) {
 			log.error("Problems running service", e);
+		}
+	}
+
+	@Scheduled(cron = "${app.schedule.report.cron}")
+	public void generateReport() {
+		LocalDate reportDate = LocalDate.now().minusDays(1);
+		boolean result = reportService.generateReport(new File(TaskListService.DATA_STORAGE), reportDate, "");
+		if (result) {
+			log.debug("Report generated sucessfully for {}", reportDate);
 		}
 	}
 }

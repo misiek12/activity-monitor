@@ -1,14 +1,14 @@
 package com.netrobol.activitymonitor.service;
 
 import java.io.*;
-import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.util.*;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.io.FileUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -17,61 +17,110 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class TaskListService {
 
-	protected static final org.slf4j.Logger eventLog = org.slf4j.LoggerFactory.getLogger("eventLog");
+	protected final static String TASKLIST_CMD = "tasklist /FI \"STATUS eq running\" /FO CSV";
+	public static String DATA_STORAGE = System.getProperty("user.home") + "/" + "activityMonitor.csv";
 
-	public static final String TASKLIST_CMD = "tasklist /FI \"STATUS eq running\" /FO CSV";
-
-	Set<String> excludedProcesses = null;
+	Set<String> initialProcessesToExclude = new HashSet<>();
 	public LocalDateTime lastRunTime = LocalDateTime.now();
 
 	@Getter
-	Map<String, Long> runningTimes = new HashMap<>();
+	Map<String, Long> appRunningTimes = new HashMap<>();
+
+	@Value("${app.excluded.extra}")
+	String additionalProgramsToIgnore = "";
 
 	public void init() {
-		log.debug("Initializing service");
+		log.debug("Initializing service storage: {}", DATA_STORAGE);
 		String commandOutput = runSystemCommand(TASKLIST_CMD);
-		excludedProcesses = processTaskListData(commandOutput);
-		eventLog.info("Inititialized with {} processes: {}", excludedProcesses.size(), excludedProcesses);
+		initialProcessesToExclude = processTaskListData(commandOutput);
+		addAdditionalProgramsToExclude();
+		loadPreviousRunningTimes();
+		log.info("Inititialized with {} processes: {}", initialProcessesToExclude.size(), initialProcessesToExclude);
+	}
+
+	private void addAdditionalProgramsToExclude() {
+		String[] programNames = additionalProgramsToIgnore.split(",");
+		for (String programName : programNames) {
+			initialProcessesToExclude.add(programName.trim());
+		}
+	}
+
+	private void loadPreviousRunningTimes() {
+		File dataStorage = new File(DATA_STORAGE);
+		if (!dataStorage.exists()) {
+			return;
+		}
+
+		try {
+			Reader in = new FileReader(dataStorage);
+			Iterable<CSVRecord> records = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(in);
+			for (CSVRecord record : records) {
+				String key = record.get(0) + ":" + record.get(1);
+				appRunningTimes.put(key, Long.valueOf(record.get(2)));
+			}
+			log.debug("Finished loading previous results: {}", appRunningTimes);
+		} catch (IOException e) {
+			log.warn("Problems loading previous results. Storage will be deleted", e);
+			dataStorage.delete();
+		}
 	}
 
 	public void execute() {
 		String commandOutput = runSystemCommand(TASKLIST_CMD);
 		Set<String> runningProcesses = processTaskListData(commandOutput);
-		runningProcesses.removeAll(excludedProcesses);
-		if (runningProcesses.size() > 0) {
-			processRunningTimes(runningProcesses);
-			log.debug("Timing info: {}", runningTimes);
+		runningProcesses.removeAll(initialProcessesToExclude);
+		if (runningProcesses.size() == 0) {
+			lastRunTime = LocalDateTime.now();
+			return;
 		}
+		processRunningTimes(runningProcesses);
+		saveTimingInfo();
 		lastRunTime = LocalDateTime.now();
+	}
+
+	private void saveTimingInfo() {
+		StringBuilder data = new StringBuilder("Date, AppName, Seconds\n");
+		for (Map.Entry<String, Long> entry : appRunningTimes.entrySet()) {
+			String key = entry.getKey();
+			String date = key.substring(0, key.indexOf(":"));
+			String appName = key.substring(key.indexOf(":") + 1);
+			data.append(date + "," + appName + "," + entry.getValue() + "\n");
+		}
+		try {
+			FileUtils.writeStringToFile(new File(DATA_STORAGE), data.toString(), "UTF-8");
+		} catch (IOException e) {
+			log.warn("Problems writing to storage: {}", e.getMessage());
+		}
+
 	}
 
 	private void processRunningTimes(Set<String> runningProcesses) {
 		long timeInterval = Duration.between(lastRunTime, LocalDateTime.now()).getSeconds();
-
+		LocalDate today = LocalDate.now();
+		Map<String, Long> updatedApps = new HashMap<>();
 		for (String processName : runningProcesses) {
-			if (runningTimes.containsKey(processName)) {
-				runningTimes.replace(processName, runningTimes.get(processName) + timeInterval);
+			String key = today.toString() + ":" + processName;
+			if (appRunningTimes.containsKey(key)) {
+				appRunningTimes.replace(key, appRunningTimes.get(key) + timeInterval);
+				updatedApps.put(key, appRunningTimes.get(key));
 			} else {
-				runningTimes.put(processName, timeInterval);
+				appRunningTimes.put(key, timeInterval);
 			}
+		}
+
+		if (updatedApps.size() > 0) {
+			log.debug("Running apps: {}", updatedApps);
 		}
 	}
 
 	private Set<String> processTaskListData(String commandOutput) {
 		Set<String> processNames = new HashSet<>();
-
-		if (StringUtils.isEmpty(commandOutput)) {
-			log.warn("Input data for tasklist processing is empty. No action");
-			return processNames;
-		}
-
 		try {
 			Reader in = new StringReader(commandOutput);
 			Iterable<CSVRecord> records = CSVFormat.DEFAULT.parse(in);
 			for (CSVRecord record : records) {
 				processNames.add(record.get(0));
 			}
-
 		} catch (IOException e) {
 			log.error("Problems processing CSV data", e);
 		}
@@ -79,7 +128,6 @@ public class TaskListService {
 	}
 
 	protected String runSystemCommand(String command, boolean waitForResponse) {
-		log.debug("Running: {}", command);
 		Runtime rt = Runtime.getRuntime();
 		StringBuffer buf = new StringBuffer();
 		BufferedReader input = null;
@@ -117,6 +165,15 @@ public class TaskListService {
 
 	public String runSystemCommand(String command) {
 		return runSystemCommand(command, true);
+	}
+
+	public Long getRunningTimeForApp(String testAppName, LocalDate date) {
+		return appRunningTimes.get(date.toString() + ":" + testAppName);
+	}
+
+	public void resetLastRun() {
+		lastRunTime = LocalDateTime.now();
+
 	}
 
 }

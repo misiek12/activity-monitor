@@ -1,7 +1,7 @@
 # activity-monitor
 
-This projects records info about running processes into  system event log. 
-There are several windows commands that are used to get data and run automated tests
+This projects records info about running processes on given computer. 
+There are several windows commands that are used to get system data 
 
 Get info about all running processes
 tasklist /FI "STATUS eq running" /FO CSV /NH
