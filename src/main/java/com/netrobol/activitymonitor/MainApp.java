@@ -1,6 +1,5 @@
 package com.netrobol.activitymonitor;
 
-import java.io.File;
 import java.time.LocalDate;
 
 import javax.annotation.PostConstruct;
@@ -10,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
@@ -20,15 +20,16 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @EnableScheduling
+@EnableJpaRepositories(basePackages = "com.netrobol.activitymonitor.repository")
 @SpringBootApplication
-public class ActivityMonitorApplication {
+public class MainApp {
 
 	@Autowired
 	ApplicationContext ctx;
 
 	public static void main(String[] args) {
 		log.debug("Starting...");
-		SpringApplication.run(ActivityMonitorApplication.class, args);
+		SpringApplication.run(MainApp.class, args);
 	}
 
 	@Autowired
@@ -39,11 +40,7 @@ public class ActivityMonitorApplication {
 
 	@PostConstruct
 	public void init() {
-		try {
-			taskInfoService.init();
-		} catch (Exception e) {
-			log.error("Problems initializing service", e);
-		}
+		taskInfoService.init();
 	}
 
 	@PreDestroy
@@ -53,17 +50,13 @@ public class ActivityMonitorApplication {
 
 	@Scheduled(fixedRateString = "${app.schedule.frequency.check}", initialDelayString = "${app.schedule.initialDelay}")
 	public void checkActiviti() {
-		try {
-			taskInfoService.execute();
-		} catch (Exception e) {
-			log.error("Problems running service", e);
-		}
+		taskInfoService.execute();
 	}
 
 	@Scheduled(cron = "${app.schedule.report.cron}")
 	public void generateReport() {
 		LocalDate reportDate = LocalDate.now().minusDays(1);
-		boolean result = reportService.generateReport(new File(TaskListService.DATA_STORAGE), reportDate, "");
+		boolean result = reportService.generateReport(reportDate, "");
 		if (result) {
 			log.debug("Report generated sucessfully for {}", reportDate);
 		}

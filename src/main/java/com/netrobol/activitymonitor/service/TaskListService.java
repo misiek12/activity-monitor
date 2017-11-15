@@ -6,7 +6,6 @@ import java.util.*;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 public class TaskListService {
 
 	protected final static String TASKLIST_CMD = "tasklist /FI \"STATUS eq running\" /FO CSV";
-	public static String DATA_STORAGE = System.getProperty("user.home") + "/" + "activityMonitor.csv";
 
 	Set<String> initialProcessesToExclude = new HashSet<>();
 	public LocalDateTime lastRunTime = LocalDateTime.now();
@@ -30,7 +28,7 @@ public class TaskListService {
 	String additionalProgramsToIgnore = "";
 
 	public void init() {
-		log.debug("Initializing service storage: {}", DATA_STORAGE);
+		log.debug("Initializing service");
 		String commandOutput = runSystemCommand(TASKLIST_CMD);
 		initialProcessesToExclude = processTaskListData(commandOutput);
 		addAdditionalProgramsToExclude();
@@ -46,23 +44,7 @@ public class TaskListService {
 	}
 
 	private void loadPreviousRunningTimes() {
-		File dataStorage = new File(DATA_STORAGE);
-		if (!dataStorage.exists()) {
-			return;
-		}
 
-		try {
-			Reader in = new FileReader(dataStorage);
-			Iterable<CSVRecord> records = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(in);
-			for (CSVRecord record : records) {
-				String key = record.get(0) + ":" + record.get(1);
-				appRunningTimes.put(key, Long.valueOf(record.get(2)));
-			}
-			log.debug("Finished loading previous results: {}", appRunningTimes);
-		} catch (IOException e) {
-			log.warn("Problems loading previous results. Storage will be deleted", e);
-			dataStorage.delete();
-		}
 	}
 
 	public void execute() {
@@ -79,18 +61,6 @@ public class TaskListService {
 	}
 
 	private void saveTimingInfo() {
-		StringBuilder data = new StringBuilder("Date, AppName, Seconds\n");
-		for (Map.Entry<String, Long> entry : appRunningTimes.entrySet()) {
-			String key = entry.getKey();
-			String date = key.substring(0, key.indexOf(":"));
-			String appName = key.substring(key.indexOf(":") + 1);
-			data.append(date + "," + appName + "," + entry.getValue() + "\n");
-		}
-		try {
-			FileUtils.writeStringToFile(new File(DATA_STORAGE), data.toString(), "UTF-8");
-		} catch (IOException e) {
-			log.warn("Problems writing to storage: {}", e.getMessage());
-		}
 
 	}
 

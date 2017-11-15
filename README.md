@@ -1,16 +1,15 @@
 # activity-monitor
 
 This projects records info about running processes on given computer. 
-There are several windows commands that are used to get system data 
+Information is obtained by running system command
 
-Get info about all running processes
+Windows:
 tasklist /FI "STATUS eq running" /FO CSV /NH
 
-Find where given program is running
-where /R C:\ notepad.exe
+Data is saved into database. Report is executed on predefined schedule.
 
-Kill program
-taskkill /pid /F 17568
 
-Start Program minimalized
-start /MIN notepad.exe
+Some other usefull commands on Windows.
+Find where given program is running:   where /R C:\ notepad.exe
+Kill program:                          taskkill /pid /F 17568
+Start Program minimalized:             start /MIN notepad.exe

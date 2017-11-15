@@ -8,37 +8,25 @@ import java.time.LocalDate;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.junit.*;
-import org.junit.rules.TemporaryFolder;
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StringUtils;
 
-import com.netrobol.activitymonitor.ActivityMonitorApplication;
+import com.netrobol.activitymonitor.MainApp;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RunWith(SpringRunner.class)
-@SpringBootTest(classes = ActivityMonitorApplication.class)
+@SpringBootTest(classes = MainApp.class)
 @TestPropertySource(locations = "classpath:application-test.properties")
 public class TaskListServiceTest {
 
 	private static final String TEST_APP_NAME = "notepad.exe";
 
-	@ClassRule
-	public static TemporaryFolder testFolder = new TemporaryFolder();
-	private final static String dataFileName = "testData.csv";
-
-	@BeforeClass
-	public static void initTestClass() {
-		TaskListService.DATA_STORAGE = testFolder.getRoot().getAbsolutePath() + "/" + dataFileName;
-	}
-
-	@InjectMocks
 	TaskListService testObj = new TaskListService();
 
 	@Test

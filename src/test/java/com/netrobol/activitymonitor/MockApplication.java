@@ -6,16 +6,18 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 import com.netrobol.activitymonitor.service.*;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@EnableJpaRepositories(basePackages = "com.netrobol.activitymonitor.repository")
 @SpringBootApplication
-public class MocksApplication {
+public class MockApplication {
 	public static void main(String[] args) {
-		SpringApplication.run(MocksApplication.class, args);
+		SpringApplication.run(MockApplication.class, args);
 	}
 
 	@Bean
