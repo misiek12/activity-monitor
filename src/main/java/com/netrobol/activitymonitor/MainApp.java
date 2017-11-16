@@ -1,9 +1,11 @@
 package com.netrobol.activitymonitor;
 
+import java.sql.SQLException;
 import java.time.LocalDate;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
@@ -27,6 +29,9 @@ public class MainApp {
 	@Autowired
 	ApplicationContext ctx;
 
+	@Autowired
+	DataSource mainDataSource;
+
 	public static void main(String[] args) {
 		log.debug("Starting...");
 		SpringApplication.run(MainApp.class, args);
@@ -40,6 +45,11 @@ public class MainApp {
 
 	@PostConstruct
 	public void init() {
+		try {
+			log.debug("DataSource {}", mainDataSource.getConnection().getMetaData().getURL());
+		} catch (SQLException e) {
+			log.error("Problems getting db info", e);
+		}
 		taskInfoService.init();
 	}
 

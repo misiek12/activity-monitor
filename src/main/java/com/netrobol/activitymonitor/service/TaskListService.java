@@ -4,28 +4,37 @@ import java.io.*;
 import java.time.*;
 import java.util.*;
 
+import javax.annotation.Resource;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.exec.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.netrobol.activitymonitor.repository.ActivityEntity;
+import com.netrobol.activitymonitor.repository.ActivityEntityRepository;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-public class TaskListService {
+public class TaskListService implements ExecuteResultHandler {
 
-	protected final static String TASKLIST_CMD = "tasklist /FI \"STATUS eq running\" /FO CSV";
+	final static String TASKLIST_CMD = "tasklist /FI \"STATUS eq running\" /FO CSV";
 
 	Set<String> initialProcessesToExclude = new HashSet<>();
-	public LocalDateTime lastRunTime = LocalDateTime.now();
+	LocalDateTime lastRunTime = LocalDateTime.now();
 
 	@Getter
 	Map<String, Long> appRunningTimes = new HashMap<>();
 
 	@Value("${app.excluded.extra}")
 	String additionalProgramsToIgnore = "";
+
+	@Resource
+	ActivityEntityRepository repository;
 
 	public void init() {
 		log.debug("Initializing service");
@@ -56,31 +65,54 @@ public class TaskListService {
 			return;
 		}
 		processRunningTimes(runningProcesses);
-		saveTimingInfo();
+		saveTimingInfo(runningProcesses);
 		lastRunTime = LocalDateTime.now();
 	}
 
-	private void saveTimingInfo() {
+	private void saveTimingInfo(Set<String> runningProcesses) {
+		try {
+			log.debug("Saving timing info for {} processes", runningProcesses.size());
+			LocalDate today = LocalDate.now();
 
+			List<ActivityEntity> entitiesToSave = new ArrayList<>();
+			for (String processName : runningProcesses) {
+				List<ActivityEntity> entities = repository
+						.findByLocator(ActivityEntity.generateLocator(processName, today));
+				if (entities == null || entities.isEmpty()) {
+					ActivityEntity entity = new ActivityEntity(processName, today, appRunningTimes.get(processName));
+					entitiesToSave.add(entity);
+				} else {
+					entities.get(0).setTotalSeconds(appRunningTimes.get(processName));
+					entitiesToSave.add(entities.get(0));
+				}
+			}
+			entitiesToSave = repository.save(entitiesToSave);
+			repository.flush();
+
+			log.debug("Saved process info: {}", entitiesToSave);
+		} catch (Exception e) {
+			log.error("Problems saving execution info", e);
+		}
 	}
 
 	private void processRunningTimes(Set<String> runningProcesses) {
 		long timeInterval = Duration.between(lastRunTime, LocalDateTime.now()).getSeconds();
 		LocalDate today = LocalDate.now();
-		Map<String, Long> updatedApps = new HashMap<>();
+
 		for (String processName : runningProcesses) {
-			String key = today.toString() + ":" + processName;
+			String key = processName;
 			if (appRunningTimes.containsKey(key)) {
 				appRunningTimes.replace(key, appRunningTimes.get(key) + timeInterval);
-				updatedApps.put(key, appRunningTimes.get(key));
 			} else {
 				appRunningTimes.put(key, timeInterval);
 			}
 		}
 
-		if (updatedApps.size() > 0) {
-			log.debug("Running apps: {}", updatedApps);
+		log.debug("{} running apps: {}", appRunningTimes.size(), appRunningTimes.keySet());
+		for (Map.Entry<String, Long> entry : appRunningTimes.entrySet()) {
+			log.debug("{} running for {} secs today", entry.getKey(), entry.getValue());
 		}
+
 	}
 
 	private Set<String> processTaskListData(String commandOutput) {
@@ -98,38 +130,23 @@ public class TaskListService {
 	}
 
 	protected String runSystemCommand(String command, boolean waitForResponse) {
-		Runtime rt = Runtime.getRuntime();
-		StringBuffer buf = new StringBuffer();
-		BufferedReader input = null;
 		try {
-			Process pr = rt.exec(command);
+			log.debug("Executing: {}", command);
+			ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+			CommandLine commandline = CommandLine.parse(command);
+			DefaultExecutor exec = new DefaultExecutor();
+			PumpStreamHandler streamHandler = new PumpStreamHandler(outputStream);
+			exec.setStreamHandler(streamHandler);
 			if (waitForResponse) {
-				input = new BufferedReader(new InputStreamReader(pr.getInputStream()));
-				String line = null;
-				while ((line = input.readLine()) != null) {
-					buf.append(line + "\n");
-				}
-
-				checkForErrorCode(pr);
+				int returnCode = exec.execute(commandline);
+				log.debug("Command finished code: {}", returnCode);
+			} else {
+				exec.execute(commandline, this);
 			}
-			return buf.toString();
-		} catch (IOException e) {
-			log.error("Problems running command '{}': {}", command, e.getMessage());
+			return (outputStream.toString());
+		} catch (Exception e) {
+			log.error("Problems executing: {}", command, e);
 			return null;
-		} finally {
-			if (input != null) {
-				try {
-					input.close();
-				} catch (IOException e) {
-				}
-			}
-		}
-	}
-
-	private void checkForErrorCode(Process pr) {
-		int returnCode = pr.exitValue();
-		if (returnCode > 0) {
-			log.error("Command not executed sucessfully. Error code:{}", returnCode);
 		}
 	}
 
@@ -137,12 +154,23 @@ public class TaskListService {
 		return runSystemCommand(command, true);
 	}
 
-	public Long getRunningTimeForApp(String testAppName, LocalDate date) {
-		return appRunningTimes.get(date.toString() + ":" + testAppName);
+	public Long getRunningTimeForApp(String testAppName) {
+		return appRunningTimes.get(testAppName);
 	}
 
 	public void resetLastRun() {
 		lastRunTime = LocalDateTime.now();
+
+	}
+
+	@Override
+	public void onProcessComplete(int arg0) {
+
+	}
+
+	@Override
+	public void onProcessFailed(ExecuteException arg0) {
+		log.debug("Command failed: {}", arg0);
 
 	}
 

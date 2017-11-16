@@ -39,7 +39,7 @@ public class ActivityEntity {
 		this.appName = appName;
 		this.totalSeconds = totalSeconds;
 		this.recordDate = date;
-		this.locator = generateLocator();
+		this.locator = generateLocator(appName, date);
 	}
 
 	@PreUpdate
@@ -50,11 +50,16 @@ public class ActivityEntity {
 	@PrePersist
 	public void prePersist() {
 		lastUpdated = LocalDateTime.now();
-		this.locator = generateLocator();
+		this.locator = generateLocator(appName, recordDate);
 	}
 
-	private int generateLocator() {
-		return (recordDate.toString() + appName).hashCode() & 0xfffffff;
+	public static int generateLocator(String procName, LocalDate date) {
+		return (date.toString() + procName).hashCode() & 0xfffffff;
+	}
+
+	public String toString() {
+		return "(" + this.getId() + ", " + this.getAppName() + ", " + this.getRecordDate() + ", "
+				+ this.getTotalSeconds() + "secs)";
 	}
 
 }

@@ -3,7 +3,6 @@ package com.netrobol.activitymonitor.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class ReportService {
-	protected static final Logger reportLog = org.slf4j.LoggerFactory.getLogger("eventLog");
 
 	@Getter
 	private String lastReport = "";

@@ -1,17 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
-	<Properties>
-		<Property name="dllfile">src/main/resources/Win32EventLogAppender.dll</Property>
-	</Properties>
-
 	<Appenders>
 		<Console name="Console" target="SYSTEM_OUT">
 			<PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{1} - %msg%n" />
 		</Console>
-		<Win32EventLog name="Win32EventLog" eventMessageFile="${dllfile}"
-			categoryMessageFile="${dllfile}" source="activityMonitor">
-			<PatternLayout pattern="%m%n" />
-		</Win32EventLog>
 	</Appenders>
 
 	<Loggers>
@@ -20,9 +12,6 @@
 		</Root>
 		<Logger name="com.netrobol" level="debug" additivity="false">
 			<AppenderRef ref="Console" />
-		</Logger>
-		<Logger name="eventLog" level="debug" additivity="false">
-			<AppenderRef ref="Win32EventLog" />
 		</Logger>
 	</Loggers>
 </Configuration>
