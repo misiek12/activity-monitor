@@ -59,6 +59,18 @@ public class ActivityEntityTest {
 		queryResults.setTotalSeconds(200L);
 		ActivityEntity updatedResults = repository.save(queryResults);
 		assertThat(updatedResults.getTotalSeconds(), equalTo(200L));
+	}
+
+	@Test
+	public void testQueryByRecordDate() {
+		List<ActivityEntity> activities = new ArrayList<>();
+		activities.add(new ActivityEntity("test.exe", LocalDate.now(), 100L));
+		activities.add(new ActivityEntity("test.exe", LocalDate.now().minusDays(1), 50L));
+		activities.add(new ActivityEntity("test.exe", LocalDate.now().minusDays(2), 60L));
+
+		repository.save(activities);
+		List<ActivityEntity> queryResults = repository.findByRecordDate(LocalDate.now());
+		assertThat(queryResults, hasSize(1));
 
 	}
 }

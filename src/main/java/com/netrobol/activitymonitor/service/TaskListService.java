@@ -53,7 +53,11 @@ public class TaskListService implements ExecuteResultHandler {
 	}
 
 	private void loadPreviousRunningTimes() {
-
+		List<ActivityEntity> appsRunningToday = repository.findByRecordDate(LocalDate.now());
+		log.debug("Found {} records already processed today", appsRunningToday.size());
+		for (ActivityEntity entity : appsRunningToday) {
+			appRunningTimes.put(entity.getAppName(), entity.getTotalSeconds());
+		}
 	}
 
 	public void execute() {

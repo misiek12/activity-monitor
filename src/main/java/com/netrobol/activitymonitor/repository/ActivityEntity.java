@@ -15,24 +15,25 @@ import lombok.*;
 public class ActivityEntity {
 
 	@Id
-	@GeneratedValue
+	@GeneratedValue(generator = "activities_info_seq")
+	@SequenceGenerator(name = "activities_info_seq", sequenceName = "activities_info_seq", allocationSize = 1)
 	private Long id;
 
-	@Column(name = "LOCATOR")
+	@Column(name = "LOCATOR", unique = true, nullable = false)
 	private Integer locator;
 
-	@Column(name = "APP_NAME")
+	@Column(name = "APP_NAME", nullable = false)
 	private String appName;
 
-	@Column(name = "DATE_INFO")
+	@Column(name = "DATE_INFO", nullable = false)
 	@Convert(converter = LocalDateAttributeConverter.class)
 	private LocalDate recordDate = LocalDate.now();
 
-	@Column(name = "LAST_UPDATED")
+	@Column(name = "LAST_UPDATED", nullable = false)
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	private LocalDateTime lastUpdated = LocalDateTime.now();
 
-	@Column(name = "TOTAL_SECONDS")
+	@Column(name = "TOTAL_SECONDS", nullable = false)
 	private Long totalSeconds;
 
 	public ActivityEntity(String appName, LocalDate date, Long totalSeconds) {
@@ -58,8 +59,7 @@ public class ActivityEntity {
 	}
 
 	public String toString() {
-		return "(" + this.getId() + ", " + this.getAppName() + ", " + this.getRecordDate() + ", "
-				+ this.getTotalSeconds() + "secs)";
+		return "(" + this.getAppName() + ", " + this.getRecordDate() + ", " + this.getTotalSeconds() + " secs)";
 	}
 
 }
